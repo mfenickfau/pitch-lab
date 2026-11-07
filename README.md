@@ -11,6 +11,7 @@ Ear-training games made for Reece and Brian. Open it in any browser, on a phone,
 | 🕵️ **Note Detective** | *Absolute pitch*: hear a note with no reference and name it. You start with 3 notes (C, G, E) and unlock a new one each time you score 85%+ over 20 answers. A quick "scramble" plays before each note so you can't just compare it to the last one. |
 | 📏 **Interval Hunter** | *Relative pitch*: name the distance between two notes. Song hints help you remember each one (e.g. a Perfect 4th is "Here Comes the Bride"). Unlocks up to all 12 intervals, then mixes in descending and played-together intervals. |
 | 🎯 **Sharp Ears** | A 30-round higher/lower test that gets harder as you go and measures the smallest pitch difference you can hear, in cents (100 cents = one piano key). |
+| 🥁 **Tempo Sense** | Your inner clock. **Guess the BPM**: a beat plays and you set a slider to how fast it is (8 rounds). **Tap the BPM**: you see a tempo like "96 BPM", hear a 4-beat count-in, then tap 8 beats on your own. It scores your speed and your steadiness. |
 | 🎙️ **Sing It** *(optional, uses the mic)* | Hear a note, sing it back, and keep the live needle in the green zone. Singing an octave up or down still counts. Choose Deep, Middle or High to fit your voice. |
 
 Each player has their own profile with points, a daily streak and a leaderboard. Progress is saved in the browser on each device, so it doesn't carry over between devices.

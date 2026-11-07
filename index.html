@@ -127,6 +127,15 @@ p.sub{color:var(--muted);margin:0 0 18px}
 .scale{display:flex;justify-content:space-between;font-size:12px;color:var(--muted)}
 .dir{font-size:20px;font-weight:700;min-height:30px;margin-top:8px}
 .stars{font-size:30px;letter-spacing:4px}
+input[type=range]{width:100%;max-width:460px;accent-color:var(--accent);height:36px}
+.nudge{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+.nudge .btn{min-width:64px;padding:10px 12px}
+.tappad{width:100%;max-width:460px;height:170px;border-radius:24px;background:var(--panel2);border:2px solid var(--line);font-size:26px;font-weight:700;touch-action:manipulation;user-select:none;-webkit-user-select:none;transition:background .06s,border-color .2s}
+.tappad.armed{border-color:var(--accent2)}
+.tappad.hit{background:var(--accent)}
+.dots{display:flex;gap:8px;justify-content:center}
+.dots i{width:14px;height:14px;border-radius:50%;background:var(--panel2);border:1px solid var(--line)}
+.dots i.on{background:var(--accent2);border-color:var(--accent2)}
 
 /* toggles */
 .seg{display:inline-flex;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:3px}
@@ -251,8 +260,10 @@ function newProfile(name, i) {
     note: { unlocked: 3, recent: [], since: 0, per: {}, total: 0, right: 0, octave: "auto", scramble: true },
     interval: { unlocked: 3, recent: [], since: 0, per: {}, total: 0, right: 0, dir: "auto" },
     ear: { best: null, last: null, sessions: 0 },
-    sing: { voice: "mid", rounds: 0, stars: 0, best: 0 } };
+    sing: { voice: "mid", rounds: 0, stars: 0, best: 0 },
+    tempo: newTempo() };
 }
+function newTempo() { return { mode: "guess", guessRounds: 0, guessBest: 0, tapRounds: 0, tapBest: 0 }; }
 let store;
 function load() {
   try { store = JSON.parse(localStorage.getItem(KEY)); } catch (e) { store = null; }
@@ -260,6 +271,7 @@ function load() {
     store = { players: {}, current: null };
     ["Reece", "Brian"].forEach((n, i) => store.players[n] = newProfile(n, i));
   }
+  Object.values(store.players).forEach(p => { if (!p.tempo) p.tempo = newTempo(); }); // older saves
 }
 function save() { try { localStorage.setItem(KEY, JSON.stringify(store)); } catch (e) {} }
 const me = () => store.players[store.current];
@@ -329,6 +341,7 @@ screens.players = function () {
         <li><b>Note Detective</b> trains <i>absolute pitch</i>: recognising a note (like "that's a G") with no reference. You start with 3 notes and unlock more as you get them right.</li>
         <li><b>Interval Hunter</b> trains <i>relative pitch</i>: hearing the distance between two notes. This is the skill musicians use most, and anyone can get very good at it.</li>
         <li><b>Sharp Ears</b> measures how small a pitch difference you can hear, in cents (100 cents = one piano key).</li>
+        <li><b>Tempo Sense</b> trains your inner clock: guess how fast a beat is in BPM (beats per minute), or tap a tempo from memory.</li>
         <li><b>Sing It</b> (optional, uses the mic) shows live whether your voice is on the note, too high or too low.</li>
         <li><b>10 minutes a day beats an hour once a week.</b> Keep your streak going.</li>
       </ul>
@@ -340,10 +353,11 @@ screens.players = function () {
 function leaderboard(list) {
   const rows = [...list].sort((a, b) => b.points - a.points);
   return `<div class="panel"><h2>🏆 Leaderboard</h2>
-    <table class="board"><tr><th>Player</th><th class="n">Points</th><th class="n">Notes</th><th class="n">Intervals</th><th class="n">Best ear</th></tr>
+    <table class="board"><tr><th>Player</th><th class="n">Points</th><th class="n">Notes</th><th class="n">Intervals</th><th class="n">Best ear</th><th class="n">Tempo</th></tr>
     ${rows.map((p, i) => `<tr><td>${i === 0 && p.points > 0 ? "👑 " : ""}<b style="color:${p.color}">${esc(p.name)}</b></td>
       <td class="n">${p.points}</td><td class="n">${p.note.unlocked}/12</td><td class="n">${p.interval.unlocked}/12</td>
-      <td class="n">${p.ear.best ? p.ear.best.toFixed(0) + "¢" : "—"}</td></tr>`).join("")}
+      <td class="n">${p.ear.best ? p.ear.best.toFixed(0) + "¢" : "—"}</td>
+      <td class="n">${p.tempo && (p.tempo.guessRounds || p.tempo.tapRounds) ? (p.tempo.guessBest + p.tempo.tapBest) + "⭐" : "—"}</td></tr>`).join("")}
     </table></div>`;
 }
 
@@ -390,11 +404,15 @@ screens.home = function () {
       <button class="gcard" id="g4"><span class="tag">🎤 optional</span><div class="ic">🎙️</div><div class="t">Sing It</div>
         <div class="d">Hear a note, sing it back, land in the zone.</div>
         <div class="stat">${p.sing.rounds ? "Best round: " + p.sing.best + "/15 ⭐" : "Uses your microphone"}</div></button>
+      <button class="gcard" id="g5"><span class="tag">new</span><div class="ic">🥁</div><div class="t">Tempo Sense</div>
+        <div class="d">How fast is the beat? Guess the BPM, or tap it from memory.</div>
+        <div class="stat">${p.tempo.guessRounds || p.tempo.tapRounds ? "Best: guess " + p.tempo.guessBest + "/24 ⭐ · tap " + p.tempo.tapBest + "/15 ⭐" : "Train your inner metronome"}</div></button>
     </div>`);
   document.getElementById("g1").onclick = () => go(screens.note);
   document.getElementById("g2").onclick = () => go(screens.interval);
   document.getElementById("g3").onclick = () => go(screens.ear);
   document.getElementById("g4").onclick = () => go(screens.sing);
+  document.getElementById("g5").onclick = () => go(screens.tempo);
 };
 function isYesterday(d) {
   if (!d) return false; const y = new Date(); y.setDate(y.getDate() - 1);
@@ -851,6 +869,216 @@ screens.sing = function () {
   }
   function stopMic() { listening = false; cancelAnimationFrame(raf); if (stream) stream.getTracks().forEach(t => t.stop()); stream = null; }
   cleanup = stopMic;
+};
+
+
+/* ---------- Tempo Sense (guess / tap the BPM) ---------- */
+let beatNodes = [];
+function stopBeats() { beatNodes.forEach(n => { try { n.stop(); } catch (e) {} }); beatNodes = []; }
+function beatAt(t, accent) {
+  const c = audio();
+  const o = c.createOscillator(), g = c.createGain();
+  o.type = "triangle"; o.frequency.value = accent ? 1500 : 1000;
+  g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(accent ? 0.45 : 0.3, t + 0.002);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.06);
+  o.connect(g); g.connect(master); o.start(t); o.stop(t + 0.08); beatNodes.push(o);
+  if (accent) { // kick drum on beat 1
+    const k = c.createOscillator(), kg = c.createGain();
+    k.frequency.setValueAtTime(140, t); k.frequency.exponentialRampToValueAtTime(45, t + 0.15);
+    kg.gain.setValueAtTime(0.8, t); kg.gain.exponentialRampToValueAtTime(0.0001, t + 0.22);
+    k.connect(kg); kg.connect(master); k.start(t); k.stop(t + 0.24); beatNodes.push(k);
+  }
+}
+function playBeats(bpm, count, delay = 0.15) {
+  const c = audio(); stopBeats();
+  const sp = 60 / bpm, t0 = c.currentTime + delay;
+  for (let i = 0; i < count; i++) beatAt(t0 + i * sp, i % 4 === 0);
+  return (delay + count * sp) * 1000;
+}
+const tempoStars = (err, a, b, c) => err <= a ? 3 : err <= b ? 2 : err <= c ? 1 : 0;
+
+screens.tempo = function () {
+  const p = me(); const T = p.tempo;
+  let timers = [];
+  const later = (fn, ms) => timers.push(setTimeout(fn, ms));
+  h(`
+    <h1>🥁 Tempo Sense</h1>
+    <p class="sub">Tempo is how fast the beat goes, measured in <b>beats per minute (BPM)</b>. 60 BPM = one beat every second.</p>
+    <div class="hud"><div class="seg" id="mSeg"><button data-v="guess">Guess the BPM</button><button data-v="tap">Tap the BPM</button></div></div>
+    <div class="panel" id="tp"></div>
+    <div class="panel" style="margin-top:12px"><h2>Tempo landmarks</h2>
+      <ul class="tips">
+        <li><b>60</b>: a clock ticking, one per second</li>
+        <li><b>70–80</b>: a resting heartbeat, a slow ballad</li>
+        <li><b>100–110</b>: walking pace</li>
+        <li><b>120</b>: a marching band, tons of pop songs</li>
+        <li><b>128</b>: dance / EDM</li>
+        <li><b>140–180</b>: fast rock, punk, drum &amp; bass</li>
+      </ul>
+      <div class="hint">Tip: use a clock's second hand to lock in 60, then think "a bit faster or slower than that?"</div></div>`);
+  const $tp = document.getElementById("tp");
+  const reset = () => { stopBeats(); timers.forEach(clearTimeout); timers = []; document.onkeydown = null; };
+  function segs() {
+    document.querySelectorAll("#mSeg button").forEach(b => {
+      b.classList.toggle("on", b.dataset.v === T.mode);
+      b.onclick = () => { T.mode = b.dataset.v; save(); segs(); start(); };
+    });
+  }
+  function start() { reset(); T.mode === "tap" ? tapIntro() : guessGame(); }
+
+  /* ----- Guess the BPM ----- */
+  function guessGame() {
+    const ROUNDS = 8; let r = 0, stars = 0, bpm = 0, guess = 100, locked = false;
+    const results = [];
+    function q() {
+      r++; locked = false;
+      let n; do { n = randInt(50, 180); } while (Math.abs(n - bpm) < 12);
+      bpm = n;
+      $tp.innerHTML = `
+        <div class="stage">
+          <div class="row" style="justify-content:space-between;width:100%"><span class="chip">Round ${r} / ${ROUNDS}</span><span class="chip">${stars} ⭐</span></div>
+          <button class="bigplay" id="play" aria-label="Play beat">▶</button>
+          <div class="hint">Listen to the beat (tap ▶ to hear it again), then set your guess.</div>
+          <div class="tnote" id="gv">${guess}<small> BPM</small></div>
+          <input type="range" id="sl" min="40" max="200" step="1" value="${guess}" aria-label="Your BPM guess">
+          <div class="nudge"><button class="btn ghost" data-d="-5">−5</button><button class="btn ghost" data-d="-1">−1</button><button class="btn ghost" data-d="1">+1</button><button class="btn ghost" data-d="5">+5</button></div>
+          <button class="btn big" id="lock">Lock it in 🔒</button>
+          <div class="feedback" id="fb"></div>
+          <div class="row" id="after" style="justify-content:center"></div>
+        </div>`;
+      const $sl = document.getElementById("sl"), $gv = document.getElementById("gv");
+      const set = v => { guess = Math.max(40, Math.min(200, v)); $sl.value = guess; $gv.innerHTML = `${guess}<small> BPM</small>`; };
+      $sl.oninput = () => set(+$sl.value);
+      document.querySelectorAll(".nudge .btn").forEach(b => b.onclick = () => !locked && set(guess + +b.dataset.d));
+      const $play = document.getElementById("play");
+      const play = () => { $play.classList.remove("pulse"); void $play.offsetWidth; $play.classList.add("pulse"); playBeats(bpm, 8); };
+      $play.onclick = play;
+      document.getElementById("lock").onclick = lock;
+      document.onkeydown = e => {
+        if (e.code === "Space") { e.preventDefault(); play(); }
+        else if (e.key === "ArrowUp" || e.key === "ArrowRight") { e.preventDefault(); !locked && set(guess + (e.shiftKey ? 5 : 1)); }
+        else if (e.key === "ArrowDown" || e.key === "ArrowLeft") { e.preventDefault(); !locked && set(guess - (e.shiftKey ? 5 : 1)); }
+        else if (e.key === "Enter") { e.preventDefault(); locked ? document.getElementById("nx")?.click() : lock(); }
+      };
+      play();
+    }
+    function lock() {
+      if (locked) return; locked = true; stopBeats();
+      const err = Math.abs(guess - bpm) / bpm;
+      const s = tempoStars(err, 0.03, 0.07, 0.12);
+      stars += s; results.push({ bpm, guess, s });
+      if (s) addPoints(s * 10); else save();
+      const off = Math.abs(guess - bpm);
+      const doubled = Math.abs(guess - bpm * 2) / (bpm * 2) < 0.08, halved = Math.abs(guess - bpm / 2) / (bpm / 2) < 0.08;
+      document.getElementById("lock").disabled = true;
+      document.getElementById("sl").disabled = true;
+      document.getElementById("fb").innerHTML =
+        (s ? `<span class="stars">${"⭐".repeat(s)}</span><br>` : "") +
+        `<span class="${s ? "good" : "bad"}">It was <b>${bpm} BPM</b></span> <span class="hint">· you said ${guess}${off ? ` (off by ${off})` : " (exactly!)"}</span>` +
+        (doubled ? `<div class="hint">You counted double time: each beat twice. Count only the main beats.</div>` : halved ? `<div class="hint">You counted half time: every other beat. Count every beat.</div>` : "");
+      document.getElementById("after").innerHTML = `<button class="btn ghost" id="ha">🔊 ${bpm} (real)</button><button class="btn ghost" id="hy">🔊 ${guess} (yours)</button><button class="btn" id="nx">${r < ROUNDS ? "Next →" : "See score"}</button>`;
+      document.getElementById("ha").onclick = () => playBeats(bpm, 8);
+      document.getElementById("hy").onclick = () => playBeats(guess, 8);
+      document.getElementById("nx").onclick = () => { stopBeats(); r < ROUNDS ? q() : end(); };
+    }
+    function end() {
+      document.onkeydown = null;
+      T.guessRounds++; const best = stars > T.guessBest; if (best) T.guessBest = stars; save();
+      $tp.innerHTML = `
+        <div class="stage">
+          <div style="color:var(--muted)">Guess the BPM: score</div>
+          <div class="tnote">${stars}<small> / ${ROUNDS * 3} ⭐</small></div>
+          <div>${results.map(x => `<span class="chip" style="margin:3px">${x.bpm}: you ${x.guess} ${"⭐".repeat(x.s) || "–"}</span>`).join("")}</div>
+          ${best ? `<div style="color:var(--good);font-weight:700">🏅 New best!</div>` : `<div class="hint">Your best: ${T.guessBest} ⭐</div>`}
+          <div class="hint">⭐⭐⭐ within 3% · ⭐⭐ within 7% · ⭐ within 12%</div>
+          <button class="btn big" id="again">Play again</button>
+        </div>`;
+      document.getElementById("again").onclick = () => guessGame();
+    }
+    q();
+  }
+
+  /* ----- Tap the BPM ----- */
+  function tapIntro() {
+    $tp.innerHTML = `
+      <div class="stage">
+        <div style="font-size:18px">You'll see a tempo, like <b>96 BPM</b>.</div>
+        <div class="hint">You hear 4 count-in beats, then the sound stops. Keep tapping that tempo for 8 taps on your own. You score for hitting the right speed and keeping it steady.</div>
+        <button class="btn big" id="go">Start</button>
+      </div>`;
+    document.getElementById("go").onclick = () => tapGame();
+  }
+  function tapGame() {
+    const ROUNDS = 5, TAPS = 8; let r = 0, stars = 0; const results = [];
+    let target = 0, taps = [], armed = false, prev = 0;
+    function q() {
+      r++; taps = []; armed = false;
+      let n; do { n = randInt(60, 160); } while (Math.abs(n - prev) < 15); target = prev = n;
+      $tp.innerHTML = `
+        <div class="stage">
+          <div class="row" style="justify-content:space-between;width:100%"><span class="chip">Round ${r} / ${ROUNDS}</span><span class="chip">${stars} ⭐</span></div>
+          <div style="color:var(--muted)">Tap this tempo</div>
+          <div class="tnote">${target}<small> BPM</small></div>
+          <div class="dots" id="dots">${"<i></i>".repeat(TAPS)}</div>
+          <button class="tappad" id="pad">Get ready…</button>
+          <div class="feedback" id="fb"></div>
+          <div class="row" id="after" style="justify-content:center"></div>
+        </div>`;
+      const $pad = document.getElementById("pad");
+      $pad.addEventListener("pointerdown", e => { e.preventDefault(); tap(); });
+      document.onkeydown = e => { if (e.code === "Space" || e.key === "Enter") { e.preventDefault(); if (!e.repeat) tap(); } };
+      const ms = playBeats(target, 4, 0.6);
+      later(() => { $pad.textContent = "4 count-in beats…"; }, 300);
+      later(() => { armed = true; $pad.classList.add("armed"); $pad.textContent = "TAP! (or Space)"; }, ms - (60000 / target) * 0.6);
+    }
+    function tap() {
+      if (!armed) return;
+      const $pad = document.getElementById("pad"); if (!$pad) return;
+      taps.push(performance.now());
+      $pad.classList.add("hit"); later(() => $pad.classList.remove("hit"), 80);
+      document.querySelectorAll("#dots i").forEach((d, i) => d.classList.toggle("on", i < taps.length));
+      $pad.textContent = taps.length < TAPS ? `${TAPS - taps.length} more` : "Done!";
+      if (taps.length >= TAPS) { armed = false; score(); }
+    }
+    function score() {
+      document.onkeydown = null;
+      const iv = []; for (let i = 1; i < taps.length; i++) iv.push(taps[i] - taps[i - 1]);
+      const mean = iv.reduce((a, b) => a + b, 0) / iv.length;
+      const sd = Math.sqrt(iv.reduce((a, b) => a + (b - mean) ** 2, 0) / iv.length);
+      const tapped = 60000 / mean;
+      const steady = Math.max(0, Math.round(100 - (sd / mean) * 200));
+      const err = Math.abs(tapped - target) / target;
+      let s = tempoStars(err, 0.03, 0.06, 0.10);
+      if (s && steady < 70) s--; // a wobbly beat costs a star
+      stars += s; results.push({ target, tapped: Math.round(tapped), s, steady });
+      if (s) addPoints(s * 10); else save();
+      const dirTxt = tapped > target * 1.03 ? "a bit fast, so you rushed" : tapped < target * 0.97 ? "a bit slow, so you dragged" : "right on the money";
+      document.getElementById("fb").innerHTML =
+        (s ? `<span class="stars">${"⭐".repeat(s)}</span><br>` : "") +
+        `You tapped <b>${Math.round(tapped)} BPM</b> <span class="hint">(${dirTxt})</span><br>` +
+        `<span class="hint">Steadiness: ${steady}%${steady < 70 ? ". Try to keep every gap the same" : ""}</span>`;
+      document.getElementById("after").innerHTML = `<button class="btn ghost" id="ha">🔊 Hear ${target}</button><button class="btn" id="nx">${r < ROUNDS ? "Next →" : "See score"}</button>`;
+      document.getElementById("ha").onclick = () => playBeats(target, 8);
+      document.getElementById("nx").onclick = () => { stopBeats(); r < ROUNDS ? q() : end(); };
+    }
+    function end() {
+      T.tapRounds++; const best = stars > T.tapBest; if (best) T.tapBest = stars; save();
+      $tp.innerHTML = `
+        <div class="stage">
+          <div style="color:var(--muted)">Tap the BPM: score</div>
+          <div class="tnote">${stars}<small> / ${ROUNDS * 3} ⭐</small></div>
+          <div>${results.map(x => `<span class="chip" style="margin:3px">${x.target}: you ${x.tapped} ${"⭐".repeat(x.s) || "–"}</span>`).join("")}</div>
+          ${best ? `<div style="color:var(--good);font-weight:700">🏅 New best!</div>` : `<div class="hint">Your best: ${T.tapBest} ⭐</div>`}
+          <div class="hint">⭐⭐⭐ within 3% · ⭐⭐ within 6% · ⭐ within 10% · lose a star if steadiness is under 70%</div>
+          <button class="btn big" id="again">Play again</button>
+        </div>`;
+      document.getElementById("again").onclick = () => tapGame();
+    }
+    q();
+  }
+
+  segs(); start();
+  cleanup = reset;
 };
 
 /* ================= Boot ================= */
