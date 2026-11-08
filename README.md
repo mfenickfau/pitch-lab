@@ -22,3 +22,22 @@ Each player has their own profile with points, a daily streak and a leaderboard.
 
 ## Tech
 One `index.html` file with no build step. Sound is generated with the Web Audio API, and Sing It detects your pitch in the browser (YIN-style). No audio ever leaves the device.
+
+---
+
+# 💩 Hospital Simulator
+
+*The grossest game in the world*, made by Brian and Dad. Retro Atari-style graphics. It works on a PC (keyboard) and on a phone (on-screen joystick + MOP button).
+
+**▶ Play: https://mfenickfau.github.io/pitch-lab/hospital-simulator/**
+
+### Level 1: Code Brown
+You're the new night-shift nurse at St. Grossington's Hospital. All 9 rooms are covered in poop, puke, pee, blood, and (in the Operating Room) guts. Clean them all before the 3:30 timer runs out to unlock Level 2.
+
+- **Create your nurse:** name, city, skin, hair color and style, scrubs color, nurse cap, and a nurse type: *Speedy Sneakers* (faster), *Iron Stomach* (mops faster, never gags) or *Mega Bucket* (holds more).
+- **Move:** arrow keys / WASD. **Mop:** hold SPACE on a mess.
+- **Bucket:** each mess fills your bucket. When it's full, dump it at a red biohazard bin in the hallway.
+- **Watch out:** patients turn green right before they barf or poop on the floor, and stepping in pee or puke makes you slip.
+- **Pause:** P. **Mute:** M.
+
+Level 2 is coming soon. Its code is all in `hospital-simulator/index.html`, with no build step.

@@ -1,0 +1,773 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>Hospital Simulator</title>
+<meta name="description" content="The grossest game in the world. Level 1: Code Brown. Clean up 9 hospital rooms before time runs out.">
+<meta name="theme-color" content="#000000">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💩</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#000;--fg:#fcfcfc;--yel:#f8d838;--cyan:#3cbcfc;--grn:#58d854;--brn:#a0522d;--red:#f83800;--dim:#7c7c7c}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);overflow:hidden;
+  font-family:"Press Start 2P",ui-monospace,monospace;-webkit-tap-highlight-color:transparent;
+  -webkit-user-select:none;user-select:none;touch-action:manipulation}
+#stage{position:fixed;inset:0;display:flex;align-items:flex-start;justify-content:center;padding-top:env(safe-area-inset-top)}
+@media (min-aspect-ratio:1/1){#stage{align-items:center}}
+canvas#cv{image-rendering:pixelated;image-rendering:crisp-edges;display:block;background:#000}
+.screen{position:fixed;inset:0;background:#000;display:none;overflow-y:auto;z-index:10;padding:20px 16px 40px}
+.screen.on{display:block}
+.box{max-width:640px;margin:0 auto;text-align:center}
+h1{font-size:clamp(22px,6vw,40px);line-height:1.3;margin:12px 0 4px;color:var(--yel);text-shadow:4px 4px 0 var(--brn)}
+h2{font-size:clamp(13px,3.4vw,18px);color:var(--cyan);margin:22px 0 12px;line-height:1.5}
+p{font-size:11px;line-height:1.9;color:#ccc;margin:8px 0}
+.tag{color:var(--grn);font-size:11px}
+.btn{font-family:inherit;font-size:13px;color:#000;background:var(--yel);border:0;padding:14px 18px;margin:8px 4px;cursor:pointer;
+  box-shadow:4px 4px 0 var(--brn);min-height:48px}
+.btn:active{transform:translate(2px,2px);box-shadow:2px 2px 0 var(--brn)}
+.btn.alt{background:var(--cyan);box-shadow:4px 4px 0 #0058f8}
+.btn.ghost{background:#222;color:#fff;box-shadow:4px 4px 0 #444}
+label.f{display:block;text-align:left;font-size:11px;color:var(--cyan);margin:18px 0 8px}
+input[type=text]{font-family:inherit;font-size:16px;width:100%;padding:12px;background:#111;color:var(--yel);border:3px solid var(--cyan);outline:none}
+input[type=text]:focus{border-color:var(--yel)}
+.row{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-start}
+.sw{width:40px;height:40px;border:3px solid #333;cursor:pointer;padding:0}
+.sw.sel{border-color:var(--yel);outline:3px solid #fff}
+.opt{font-family:inherit;font-size:10px;background:#111;color:#fff;border:3px solid #333;padding:10px;cursor:pointer;min-height:44px}
+.opt.sel{border-color:var(--yel);color:var(--yel)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
+.card{font-family:inherit;text-align:left;background:#111;color:#fff;border:3px solid #333;padding:12px;cursor:pointer}
+.card b{display:block;color:var(--yel);font-size:11px;margin-bottom:8px;font-weight:normal}
+.card span{font-size:9px;line-height:1.7;color:#aaa}
+.card.sel{border-color:var(--yel);background:#1a1600}
+.creator{display:grid;grid-template-columns:1fr;gap:4px}
+@media (min-width:620px){.creator{grid-template-columns:180px 1fr;gap:20px;align-items:start}}
+.preview{position:sticky;top:0;background:#000;padding:8px 0;z-index:2}
+#pv{image-rendering:pixelated;width:128px;height:208px;background:#5c94fc;border:3px solid #fff}
+.pvname{font-size:10px;color:var(--yel);margin-top:6px;word-break:break-all}
+.how{text-align:left;font-size:10px;line-height:2;color:#ddd;background:#111;border:3px solid #333;padding:14px;margin-top:10px}
+.how b{color:var(--yel);font-weight:normal}
+.stats{text-align:left;font-size:11px;line-height:2.2;background:#111;border:3px solid #333;padding:14px;margin:16px 0}
+.stats .v{float:right;color:var(--yel)}
+.fact{font-size:9px;line-height:1.9;color:var(--grn);border:3px dashed #2a5a2a;padding:10px;margin:14px 0}
+.bigicons{font-size:32px;letter-spacing:6px;margin:10px 0}
+/* touch controls */
+#touch{display:none}
+body.touch #touch{display:block}
+#joy{position:fixed;left:calc(18px + env(safe-area-inset-left));bottom:calc(18px + env(safe-area-inset-bottom));width:140px;height:140px;border-radius:50%;
+  background:rgba(255,255,255,.08);border:3px solid rgba(255,255,255,.35);z-index:5;touch-action:none}
+#knob{position:absolute;left:45px;top:45px;width:50px;height:50px;border-radius:50%;background:rgba(248,216,56,.75);border:3px solid #fff;pointer-events:none}
+.tbtn{position:fixed;z-index:5;touch-action:none;font-family:inherit;border-radius:50%;border:3px solid #fff;color:#000}
+#mop{right:calc(22px + env(safe-area-inset-right));bottom:calc(28px + env(safe-area-inset-bottom));width:100px;height:100px;background:rgba(88,216,84,.85);font-size:12px}
+#mop.down{background:#f8d838}
+#pauseBtn{left:calc(50% - 23px);bottom:calc(40px + env(safe-area-inset-bottom));width:46px;height:46px;background:rgba(255,255,255,.6);font-size:10px;border-radius:8px}
+body.notplaying #touch{display:none}
+</style>
+</head>
+<body class="notplaying">
+<div id="stage"><canvas id="cv" width="320" height="254"></canvas></div>
+
+<div id="touch">
+  <div id="joy"><div id="knob"></div></div>
+  <button class="tbtn" id="mop">MOP</button>
+  <button class="tbtn" id="pauseBtn">II</button>
+</div>
+
+<!-- TITLE -->
+<div class="screen on" id="sTitle"><div class="box">
+  <div class="bigicons">💩🤮🩸</div>
+  <h1>HOSPITAL<br>SIMULATOR</h1>
+  <p class="tag">THE GROSSEST GAME IN THE WORLD</p>
+  <h2>LEVEL 1: CODE BROWN</h2>
+  <p>You're the new nurse on night shift. 9 rooms. Poop, puke, pee, blood and guts everywhere. Clean it ALL up before the clock runs out!</p>
+  <div id="contWrap"></div>
+  <button class="btn" id="bNew">NEW NURSE</button>
+  <button class="btn ghost" id="bHow">HOW TO PLAY</button>
+  <div class="how" id="howBox" style="display:none">
+    <b>MOVE:</b> Arrow keys or WASD (phone: joystick)<br>
+    <b>MOP:</b> Hold SPACE on a mess (phone: MOP button)<br>
+    <b>BUCKET:</b> Each mess goes in your bucket. When it's full, go to a <b>BIOHAZARD BIN</b> in the hallway and press SPACE to dump it.<br>
+    <b>WATCH OUT:</b> Patients turn <span style="color:#58d854">GREEN</span> right before they barf or poop. Step in pee or puke and you'll SLIP!<br>
+    <b>WIN:</b> Clean all 9 rooms before the timer hits 0:00 to unlock Level 2.<br>
+    <b>P</b> = pause &nbsp; <b>M</b> = mute
+  </div>
+</div></div>
+
+<!-- CREATOR -->
+<div class="screen" id="sCreate"><div class="box">
+  <h2 style="margin-top:4px">CREATE YOUR NURSE</h2>
+  <div class="creator">
+    <div class="preview"><canvas id="pv" width="16" height="26"></canvas><div class="pvname" id="pvName">NURSE ???</div></div>
+    <div>
+      <label class="f">NAME</label>
+      <input type="text" id="inName" maxlength="12" placeholder="Nurse name" autocomplete="off">
+      <label class="f">CITY</label>
+      <input type="text" id="inCity" maxlength="16" placeholder="Your city" list="cities" autocomplete="off">
+      <datalist id="cities"><option>New York</option><option>Los Angeles</option><option>Chicago</option><option>Houston</option><option>Miami</option><option>Seattle</option><option>Boston</option><option>Denver</option><option>London</option><option>Tokyo</option><option>Toronto</option><option>Sydney</option></datalist>
+      <label class="f">NURSE TYPE</label>
+      <div class="cards" id="types"></div>
+      <label class="f">SKIN</label><div class="row" id="rSkin"></div>
+      <label class="f">HAIR COLOR</label><div class="row" id="rHair"></div>
+      <label class="f">HAIR STYLE</label><div class="row" id="rStyle"></div>
+      <label class="f">SCRUBS</label><div class="row" id="rScrub"></div>
+      <label class="f">NURSE CAP</label><div class="row" id="rCap"></div>
+      <div style="margin-top:22px">
+        <button class="btn" id="bStart">START SHIFT ▶</button>
+        <button class="btn ghost" id="bBack">BACK</button>
+      </div>
+    </div>
+  </div>
+</div></div>
+
+<!-- END -->
+<div class="screen" id="sEnd"><div class="box">
+  <div class="bigicons" id="endIcon">🏆</div>
+  <h1 id="endTitle">SHIFT OVER</h1>
+  <p id="endMsg"></p>
+  <div class="stats" id="endStats"></div>
+  <div class="fact" id="endFact"></div>
+  <button class="btn" id="bAgain">PLAY AGAIN</button>
+  <button class="btn ghost" id="bMenu">MENU</button>
+</div></div>
+
+<script>
+"use strict";
+/* ================= CONFIG ================= */
+const W=320,H=254;
+const RW=96,RH=64,HALL=14,X0=2,Y0=18,WT=3,DOOR=18;
+const BW=3*RW+2*HALL,BH=3*RH+2*HALL;
+const TIME_LIMIT=210; // seconds (3:30)
+const EXTRA_SPAWNS=8;
+
+const SKINS=['#fcd8a8','#e4a672','#c07840','#8c5030','#5a3218'];
+const HAIRS=['#1c1c1c','#6c3c14','#d8a038','#c83c14','#e8e8e8','#a050e0'];
+const SCRUBS=['#3cbcfc','#58d854','#f878f8','#f83800','#6844fc','#fcfcfc'];
+const STYLES=['SHORT','LONG','BUN','BALD'];
+const TYPES=[
+  {id:'speedy',name:'SPEEDY SNEAKERS',desc:'Runs 30% faster down the halls.'},
+  {id:'iron',name:'IRON STOMACH',desc:'Never gags. Mops 60% faster.'},
+  {id:'bucket',name:'MEGA BUCKET',desc:'Bucket holds 10 messes instead of 6.'},
+];
+const MESS={
+  poop:{t:1.2,u:1,pts:100,w:8,h:7,name:'POOP'},
+  puke:{t:1.4,u:1,pts:120,w:12,h:8,name:'PUKE'},
+  pee:{t:1.0,u:1,pts:80,w:14,h:7,name:'PEE'},
+  blood:{t:1.0,u:1,pts:90,w:12,h:8,name:'BLOOD'},
+  guts:{t:1.8,u:2,pts:200,w:14,h:9,name:'GUTS'},
+};
+const FACTS=[
+  'GROSS FACT: The average person farts about 14 times a day.',
+  'GROSS FACT: Your nose can remember about 50,000 different smells. Sorry.',
+  'GROSS FACT: You make about 1 to 2 liters of spit every day.',
+  'GROSS FACT: Your stomach gets a new lining every few days so it does not digest itself.',
+  'GROSS FACT: Barf is sour because of stomach acid, which is strong enough to dissolve metal.',
+  'GROSS FACT: Poop is about 75% water.',
+  'GROSS FACT: Your intestines are about as long as a school bus.',
+  'GROSS FACT: Vomit comes out at up to 20 miles per hour!',
+  'GROSS FACT: There are more bacteria in your gut than there are people on Earth.',
+];
+
+/* ================= STORAGE ================= */
+const store={
+  get(k,d){try{const v=localStorage.getItem('hospsim.'+k);return v?JSON.parse(v):d}catch(e){return d}},
+  set(k,v){try{localStorage.setItem('hospsim.'+k,JSON.stringify(v))}catch(e){}}
+};
+let profile=store.get('profile',null);
+
+/* ================= AUDIO ================= */
+let AC=null,master=null,muted=store.get('muted',false),noiseBuf=null;
+function audioInit(){
+  if(AC){if(AC.state==='suspended')AC.resume();return}
+  try{
+    AC=new (window.AudioContext||window.webkitAudioContext)();
+    master=AC.createGain();master.gain.value=muted?0:0.5;master.connect(AC.destination);
+    noiseBuf=AC.createBuffer(1,AC.sampleRate,AC.sampleRate);
+    const d=noiseBuf.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;
+  }catch(e){AC=null}
+}
+function setMuted(m){muted=m;store.set('muted',m);if(master)master.gain.value=m?0:0.5}
+function env(g,t,a,peak,dur){g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(peak,t+a);g.gain.exponentialRampToValueAtTime(0.0001,t+dur)}
+function noise(dur,type,f0,f1,peak=0.6,q=1){
+  if(!AC)return;const t=AC.currentTime;
+  const s=AC.createBufferSource();s.buffer=noiseBuf;
+  const f=AC.createBiquadFilter();f.type=type;f.Q.value=q;f.frequency.setValueAtTime(f0,t);f.frequency.exponentialRampToValueAtTime(f1,t+dur);
+  const g=AC.createGain();env(g,t,0.01,peak,dur);
+  s.connect(f);f.connect(g);g.connect(master);s.start(t);s.stop(t+dur+0.05);
+}
+function tone(type,f0,f1,dur,peak=0.3,delay=0){
+  if(!AC)return;const t=AC.currentTime+delay;
+  const o=AC.createOscillator();o.type=type;o.frequency.setValueAtTime(f0,t);o.frequency.exponentialRampToValueAtTime(f1,t+dur);
+  const g=AC.createGain();env(g,t,0.01,peak,dur);o.connect(g);g.connect(master);o.start(t);o.stop(t+dur+0.05);
+}
+const sfx={
+  splat(){noise(0.25,'lowpass',900,150,0.8)},
+  barf(){
+    if(!AC)return;noise(0.8,'bandpass',1200,180,0.9,2);
+    const t=AC.currentTime,o=AC.createOscillator(),g=AC.createGain(),f=AC.createBiquadFilter();
+    o.type='sawtooth';o.frequency.setValueAtTime(220,t);o.frequency.exponentialRampToValueAtTime(70,t+0.7);
+    f.type='lowpass';f.frequency.value=700;env(g,t,0.05,0.35,0.75);o.connect(f);f.connect(g);g.connect(master);o.start(t);o.stop(t+0.8);
+    setTimeout(()=>sfx.splat(),650);
+  },
+  fart(){
+    if(!AC)return;const t=AC.currentTime,dur=0.45+Math.random()*0.4;
+    const o=AC.createOscillator(),l=AC.createOscillator(),lg=AC.createGain(),f=AC.createBiquadFilter(),g=AC.createGain();
+    o.type='sawtooth';o.frequency.setValueAtTime(95+Math.random()*30,t);o.frequency.linearRampToValueAtTime(60,t+dur);
+    l.frequency.value=18+Math.random()*14;lg.gain.value=30;l.connect(lg);lg.connect(o.frequency);
+    f.type='lowpass';f.frequency.value=420;env(g,t,0.02,0.5,dur);
+    o.connect(f);f.connect(g);g.connect(master);o.start(t);l.start(t);o.stop(t+dur+.05);l.stop(t+dur+.05);
+    noise(dur,'lowpass',300,120,0.25);
+  },
+  scrub(){noise(0.07,'highpass',2500,1800,0.18)},
+  ding(){tone('square',880,880,0.08,0.15);tone('square',1320,1320,0.12,0.15,0.08)},
+  slip(){tone('sine',1400,250,0.45,0.3)},
+  glug(){for(let i=0;i<5;i++)tone('sine',300-i*35,120-i*10,0.12,0.4,i*0.1)},
+  tick(){tone('square',1000,1000,0.03,0.1)},
+  full(){tone('square',200,200,0.12,0.2);tone('square',150,150,0.2,0.2,0.14)},
+  win(){[523,659,784,1047,784,1047].forEach((f,i)=>tone('square',f,f,0.14,0.18,i*0.13))},
+  lose(){[392,330,262,196].forEach((f,i)=>tone('sawtooth',f,f*0.97,0.3,0.18,i*0.28))},
+  gag(){tone('sawtooth',160,90,0.25,0.15)},
+};
+
+/* ================= SPRITES ================= */
+const NURSE_BASE=[
+  "........",
+  "..HHHH..",
+  ".HHHHHH.",
+  ".HSSSSH.",
+  ".SESSES.",
+  "..SMMS..",
+  ".CCCCCC.",
+  "SCCWCCCS",
+  "SCCCCCCS",
+  ".CCCCCC.",
+];
+const LEGS=[[".DD..DD.",".DD..DD.",".KK..KK."],["..DDDD..",".DD..DD.","KK....KK"]];
+function nurseRows(p,frame){
+  let rows=NURSE_BASE.map(r=>r.split(''));
+  if(p.style==='LONG'){for(const y of [3,4,5,6]){rows[y][0]='H';rows[y][7]='H'}}
+  if(p.style==='BALD'){rows[1]="..SSSS..".split('');rows[2]=".SSSSSS.".split('');rows[3][1]='S';rows[3][6]='S'}
+  if(p.style==='BUN'&&!p.cap){rows[0]="...HH...".split('')}
+  if(p.cap){rows[0]="..WWWW..".split('');rows[1]=".WWRWWW.".split('')}
+  return rows.concat(LEGS[frame].map(r=>r.split('')));
+}
+function nurseColor(p,c,gag){
+  switch(c){
+    case 'H':return HAIRS[p.hair];case 'S':return gag?'#80d010':SKINS[p.skin];case 'E':return '#000';
+    case 'M':return gag?'#4c8c00':'#c84c4c';case 'C':return SCRUBS[p.scrub];case 'W':return '#fcfcfc';
+    case 'R':return '#f83800';case 'D':return shade(SCRUBS[p.scrub],-0.3);case 'K':return '#fcfcfc';
+  }return null;
+}
+function shade(hex,amt){
+  let n=parseInt(hex.slice(1),16),r=n>>16,g=(n>>8)&255,b=n&255;
+  const f=v=>Math.max(0,Math.min(255,Math.round(amt<0?v*(1+amt):v+(255-v)*amt)));
+  return '#'+((1<<24)|(f(r)<<16)|(f(g)<<8)|f(b)).toString(16).slice(1);
+}
+function drawNurse(c,p,x,y,frame,flip,gag,scale=1){
+  const rows=nurseRows(p,frame);
+  for(let r=0;r<rows.length;r++)for(let i=0;i<8;i++){
+    const ch=rows[r][flip?7-i:i];if(ch==='.')continue;
+    c.fillStyle=nurseColor(p,ch,gag);c.fillRect(x+i*scale,y+r*scale,scale,scale);
+  }
+}
+
+/* ================= CANVAS SETUP ================= */
+const cv=document.getElementById('cv'),ctx=cv.getContext('2d');
+ctx.imageSmoothingEnabled=false;
+function fit(){
+  const touch=document.body.classList.contains('touch');
+  const portrait=innerHeight>innerWidth;
+  const availH=touch&&portrait?innerHeight-200:innerHeight;
+  let s=Math.min(innerWidth/W,availH/H);
+  if(s>=2)s=Math.floor(s*2)/2;
+  cv.style.width=Math.floor(W*s)+'px';cv.style.height=Math.floor(H*s)+'px';
+}
+addEventListener('resize',fit);
+const FONT='8px "Press Start 2P", monospace';
+function txt(s,x,y,col='#fff',align='left',shadow=true){
+  ctx.font=FONT;ctx.textBaseline='top';ctx.textAlign=align;
+  if(shadow){ctx.fillStyle='#000';ctx.fillText(s,x+1,y+1)}
+  ctx.fillStyle=col;ctx.fillText(s,x,y);
+}
+
+/* ================= WORLD ================= */
+let rooms=[],walls=[],solids=[],patients=[],bins=[],messes=[],parts=[],floaters=[];
+function buildWorld(){
+  rooms=[];walls=[];solids=[];patients=[];bins=[];
+  for(let r=0;r<3;r++)for(let c=0;c<3;c++){
+    const id=r*3+c,x=X0+c*(RW+HALL),y=Y0+r*(RH+HALL);
+    const room={id,c,r,x,y,num:101+id,isOR:id===4,clean:false};
+    rooms.push(room);
+    const gT=r>0,gB=r<2,gL=c>0,gR=c<2;
+    hwall(x,y,RW,gT);hwall(x,y+RH-WT,RW,gB);vwall(x,y,RH,gL);vwall(x+RW-WT,y,RH,gR);
+    if(room.isOR){
+      room.bed={x:x+36,y:y+25,w:24,h:12};
+      patients.push({room,x:room.bed.x,y:room.bed.y,warn:0,or:true});
+    }else{
+      room.bed={x:x+WT+4,y:y+WT+4,w:24,h:12};
+      patients.push({room,x:room.bed.x,y:room.bed.y,warn:0,or:false,skin:SKINS[(id*3)%5],kind:null});
+    }
+    solids.push(room.bed);
+  }
+  walls.push({x:X0,y:Y0,w:BW,h:WT},{x:X0,y:Y0+BH-WT,w:BW,h:WT},{x:X0,y:Y0,w:WT,h:BH},{x:X0+BW-WT,y:Y0,w:WT,h:BH});
+  for(const [c,r] of [[0,0],[1,1]]){
+    bins.push({x:X0+RW+c*(RW+HALL),y:Y0+RH+r*(RH+HALL),w:HALL,h:HALL});
+  }
+  solids=solids.concat(walls);
+}
+function hwall(x,y,w,gap){
+  if(!gap){walls.push({x,y,w,h:WT});return}
+  const s=(w-DOOR)/2;walls.push({x,y,w:s,h:WT},{x:x+s+DOOR,y,w:s,h:WT});
+}
+function vwall(x,y,h,gap){
+  if(!gap){walls.push({x,y,w:WT,h});return}
+  const s=(h-DOOR)/2;walls.push({x,y,w:WT,h:s},{x,y:y+s+DOOR,w:WT,h:s});
+}
+const hit=(a,b)=>a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y;
+
+function makeMess(type,x,y,room){
+  const m=MESS[type],px=[];
+  const rnd=Math.random;
+  const put=(dx,dy,col)=>px.push({dx,dy,col,t:rnd()*0.9+0.05});
+  if(type==='poop'){
+    const shape=["...#....","..##....",".####...",".#####..","######..","#######.","########"];
+    const pal=['#7a4a1a','#5c3410','#8c5a24','#4a2808'];
+    shape.forEach((row,y)=>[...row].forEach((ch,x)=>{if(ch==='#')put(x,y,pal[(x+y*3)%4])}));
+  }else if(type==='guts'){
+    const pal=['#f878a8','#d84878','#a81838','#fca0c0'];
+    let x=2,y=2,dx=1,dy=0;
+    for(let i=0;i<60;i++){
+      put(x,y,pal[i%4]);put(x,y+1,pal[(i+1)%4]);
+      x+=dx;y+=dy;
+      if(x>=m.w-2||x<=1||rnd()<0.18){const t=dx;dx=dy?(rnd()<.5?1:-1):0;dy=t?(rnd()<.5?1:-1):0;}
+      x=Math.max(1,Math.min(m.w-2,x));y=Math.max(0,Math.min(m.h-2,y));
+    }
+    for(let i=0;i<8;i++)put(Math.floor(rnd()*m.w),Math.floor(rnd()*m.h),'#a80020');
+  }else{
+    const pal={puke:['#b8d838','#9cbc20','#d8e858','#c88c18','#e8a838'],pee:['#f8e858','#fcf088','#e8d030'],blood:['#d80000','#a80000','#f83800','#880000']}[type];
+    const cx=m.w/2,cy=m.h/2,blobs=type==='pee'?2:4;
+    const centers=[];for(let b=0;b<blobs;b++)centers.push([cx+(rnd()-.5)*m.w*.5,cy+(rnd()-.5)*m.h*.4,(type==='pee'?m.w*.42:m.w*.28)+rnd()*2]);
+    for(let y=0;y<m.h;y++)for(let x=0;x<m.w;x++){
+      let inside=false;
+      for(const [bx,by,r] of centers){const ex=(x-bx)/r,ey=(y-by)/(r*0.6);if(ex*ex+ey*ey<1){inside=true;break}}
+      if(inside||rnd()<0.04){
+        let col=pal[0];
+        if(type==='puke'&&rnd()<0.3)col=pal[3+Math.floor(rnd()*2)]; // chunks
+        else if(rnd()<0.35)col=pal[1+Math.floor(rnd()*(type==='puke'?2:pal.length-1))];
+        put(x,y,col);
+      }
+    }
+  }
+  return {type,x:Math.round(x),y:Math.round(y),w:m.w,h:m.h,hp:m.t,max:m.t,room,px,ph:rnd()*6.28,age:0};
+}
+function spotInRoom(room,type,near){
+  const m=MESS[type];
+  for(let tries=0;tries<40;tries++){
+    let x,y;
+    if(near){x=room.bed.x+Math.random()*16-2;y=room.bed.y+room.bed.h+1+Math.random()*8}
+    else{x=room.x+WT+3+Math.random()*(RW-2*WT-6-m.w);y=room.y+WT+3+Math.random()*(RH-2*WT-6-m.h)}
+    const box={x:x-2,y:y-2,w:m.w+4,h:m.h+4};
+    if(hit(box,room.bed))continue;
+    if(hit(box,{x:room.x+RW-32,y:room.y+RH-16,w:30,h:14}))continue;
+    if(messes.some(o=>hit(box,o)))continue;
+    if(x<room.x+WT+1||x+m.w>room.x+RW-WT-1||y+m.h>room.y+RH-WT-1)continue;
+    return [x,y];
+  }
+  return null;
+}
+function addMess(room,type,near){
+  const p=spotInRoom(room,type,near);if(!p)return null;
+  const m=makeMess(type,p[0],p[1],room);messes.push(m);room.clean=false;return m;
+}
+
+/* ================= GAME STATE ================= */
+let state='menu',G=null,keys={},touchVec={x:0,y:0},touchMop=false,lastT=0,tAnim=0;
+function newGame(){
+  buildWorld();messes=[];parts=[];floaters=[];
+  const basic=['poop','puke','pee','blood'];
+  for(const room of rooms){
+    if(room.isOR){for(let i=0;i<2;i++)addMess(room,'guts');for(let i=0;i<2;i++)addMess(room,'blood')}
+    else{const n=2+(Math.random()<0.5?1:0);for(let i=0;i<n;i++)addMess(room,basic[Math.floor(Math.random()*4)])}
+  }
+  const b=bins[0];
+  G={
+    time:TIME_LIMIT,score:0,cleaned:0,units:0,gunkTotal:0,
+    cap:profile.type==='bucket'?10:6,speed:profile.type==='speedy'?65:50,mopRate:profile.type==='iron'?1.6:1,
+    px:b.x+3,py:b.y-1,dir:1,flip:false,frame:0,walkT:0,
+    slide:0,slideVx:0,slideVy:0,slipCool:0,
+    scrubT:0,spawnT:7,spawnsLeft:EXTRA_SPAWNS,fartT:12,
+    msg:'',msgT:0,msgCol:'#fff',ready:3,lastTick:99,gag:0,binHint:0,startMessCount:messes.length,
+  };
+  showMsg('ROOMS 101-109 ARE GROSS! CLEAN THEM!','#f8d838',3);
+}
+function showMsg(s,col='#fff',t=2.5){G.msg=s;G.msgCol=col;G.msgT=t}
+function floater(s,x,y,col){floaters.push({s,x,y,col,t:1.2})}
+function feet(){return {x:G.px+1,y:G.py+9,w:6,h:4}}
+
+function tryMove(dx,dy){
+  if(dx){G.px+=dx;const f=feet();if(solids.some(s=>hit(f,s))){G.px-=dx;return false}}
+  if(dy){G.py+=dy;const f=feet();if(solids.some(s=>hit(f,s))){G.py-=dy;return false}}
+  return true;
+}
+
+function update(dt){
+  tAnim+=dt;
+  if(G.ready>0){G.ready-=dt;return}
+  G.time-=dt;
+  if(G.time<=10&&Math.ceil(G.time)!==G.lastTick){G.lastTick=Math.ceil(G.time);sfx.tick()}
+  if(G.time<=0){G.time=0;endGame(false);return}
+
+  // input
+  let ix=0,iy=0;
+  if(keys.ArrowLeft||keys.KeyA)ix-=1;if(keys.ArrowRight||keys.KeyD)ix+=1;
+  if(keys.ArrowUp||keys.KeyW)iy-=1;if(keys.ArrowDown||keys.KeyS)iy+=1;
+  if(touchVec.x||touchVec.y){ix=touchVec.x;iy=touchVec.y}
+  const len=Math.hypot(ix,iy);if(len>1){ix/=len;iy/=len}
+  const mop=keys.Space||keys.KeyE||keys.Enter||touchMop;
+
+  G.slipCool=Math.max(0,G.slipCool-dt);
+  if(G.slide>0){
+    G.slide-=dt;
+    tryMove(G.slideVx*dt,0);tryMove(0,G.slideVy*dt);
+    G.frame=Math.floor(tAnim*16)%2;G.flip=Math.floor(tAnim*12)%2===0;
+  }else if(!mop&&(ix||iy)){
+    const sp=G.speed*Math.min(1,len||1);
+    tryMove(ix*sp*dt,0);tryMove(0,iy*sp*dt);
+    if(ix)G.flip=ix<0;
+    G.walkT+=dt;G.frame=Math.floor(G.walkT*8)%2;
+    // slipping on wet stuff
+    if(G.slipCool<=0){
+      const f=feet();
+      const wet=messes.find(m=>(m.type==='pee'||m.type==='puke')&&hit(f,{x:m.x+2,y:m.y+1,w:m.w-4,h:m.h-2}));
+      if(wet){
+        G.slide=0.45;G.slipCool=1.6;const s=G.speed*2.2;G.slideVx=ix*s;G.slideVy=iy*s;
+        sfx.slip();floater('WHOOPS!',G.px-8,G.py-6,'#f8e858');
+        if(wet.type==='puke')showMsg('YOU SLIPPED IN PUKE! GROSS!','#b8d838');else showMsg('YOU SLIPPED IN PEE! EWWW!','#f8e858');
+      }
+    }
+  }else G.frame=0;
+
+  // mopping / dumping
+  const f=feet(),reach={x:f.x-3,y:f.y-3,w:f.w+6,h:f.h+6};
+  const bin=bins.find(b=>hit(f,b));
+  G.binHint=bin?1:0;
+  if(mop){
+    if(bin){
+      if(G.units>0){G.gunkTotal+=G.units;G.units=0;sfx.glug();floater('GLUG GLUG',bin.x-14,bin.y-6,'#58d854');showMsg('BUCKET DUMPED! NASTY.','#58d854',1.5)}
+    }else{
+      const m=messes.find(m=>hit(reach,m));
+      if(m){
+        const need=MESS[m.type].u;
+        if(G.units+need>G.cap){
+          if(G.msgT<1.2){showMsg('BUCKET FULL! DUMP IT IN A BIOHAZARD BIN','#f83800',2);sfx.full()}
+        }else{
+          m.hp-=dt*G.mopRate;G.scrubT-=dt;
+          G.flip=(m.x+m.w/2)<(G.px+4);G.frame=Math.floor(tAnim*10)%2;
+          if(G.scrubT<=0){G.scrubT=0.12;sfx.scrub();
+            for(let i=0;i<2;i++)parts.push({x:m.x+Math.random()*m.w,y:m.y+Math.random()*m.h,vx:(Math.random()-.5)*20,vy:-10-Math.random()*15,t:0.5,col:'#fcfcfc'})}
+          if(m.hp<=0)cleanMess(m,need);
+        }
+      }
+    }
+  }
+
+  // gagging when near poop/puke (not iron stomach)
+  if(profile.type!=='iron'){
+    const stinky=messes.some(m=>(m.type==='poop'||m.type==='puke'||m.type==='guts')&&Math.hypot(m.x+m.w/2-G.px-4,m.y+m.h/2-G.py-8)<14);
+    if(stinky){G.gag+=dt;if(G.gag>2.5){G.gag=-2;sfx.gag();floater('*GAG*',G.px-4,G.py-8,'#80d010')}}else G.gag=Math.min(G.gag,0);
+  }
+
+  // patients getting sick
+  G.spawnT-=dt;
+  if(G.spawnsLeft>0&&G.spawnT<=0){
+    const cands=patients.filter(p=>!p.or&&!p.warn&&messes.filter(m=>m.room===p.room).length<4);
+    if(cands.length){const p=cands[Math.floor(Math.random()*cands.length)];p.warn=1.6;p.kind=['puke','poop','pee','puke'][Math.floor(Math.random()*4)]}
+    G.spawnT=8+Math.random()*6;
+  }
+  for(const p of patients){
+    if(p.warn>0){
+      p.warn-=dt;
+      if(p.warn<=0){
+        p.warn=0;
+        const m=addMess(p.room,p.kind,true);
+        if(m){
+          G.spawnsLeft--;
+          for(let i=0;i<14;i++)parts.push({x:m.x+m.w/2,y:m.y,vx:(Math.random()-.5)*60,vy:-30-Math.random()*40,t:0.6,col:m.px[i%m.px.length].col,g:1});
+          if(p.kind==='puke'){sfx.barf();showMsg('ROOM '+p.room.num+': BLAAARGH!!','#b8d838');floater('BLAAARGH!',p.x-6,p.y-10,'#b8d838')}
+          else if(p.kind==='poop'){sfx.fart();showMsg('ROOM '+p.room.num+': OH NO... CODE BROWN!','#c87c3c');floater('PFFFRRT!',p.x-6,p.y-10,'#c87c3c')}
+          else{sfx.splat();showMsg('ROOM '+p.room.num+': OOPS, A LEAK!','#f8e858');floater('PSSSS...',p.x-6,p.y-10,'#f8e858')}
+        }
+      }
+    }
+  }
+  // random harmless farts for atmosphere
+  G.fartT-=dt;if(G.fartT<=0){G.fartT=10+Math.random()*12;sfx.fart();const p=patients[Math.floor(Math.random()*patients.length)];if(!p.or)floater('pfft',p.x+4,p.y-8,'#a0a0a0')}
+
+  // room clean status
+  for(const r of rooms){
+    const was=r.clean;r.clean=!messes.some(m=>m.room===r);
+    if(r.clean&&!was){sfx.ding();showMsg((r.isOR?'OPERATING ROOM':'ROOM '+r.num)+' IS SPARKLING CLEAN!','#3cbcfc',2)}
+  }
+
+  // particles
+  for(const p of parts){p.t-=dt;p.x+=p.vx*dt;p.y+=p.vy*dt;if(p.g)p.vy+=200*dt}
+  parts=parts.filter(p=>p.t>0);
+  for(const fl of floaters){fl.t-=dt;fl.y-=12*dt}
+  floaters=floaters.filter(f=>f.t>0);
+  G.msgT-=dt;
+
+  if(messes.length===0)endGame(true);
+}
+function cleanMess(m,need){
+  messes.splice(messes.indexOf(m),1);
+  G.units+=need;G.cleaned++;const pts=MESS[m.type].pts;G.score+=pts;
+  floater('+'+pts,m.x,m.y-4,'#f8d838');sfx.splat();
+  if(G.units>=G.cap)showMsg('BUCKET FULL! FIND A BIOHAZARD BIN','#f83800',2.5);
+}
+
+/* ================= RENDER ================= */
+function render(){
+  ctx.fillStyle='#000';ctx.fillRect(0,0,W,H);
+  if(!G)return;
+  // hallway floor
+  ctx.fillStyle='#bcbcbc';ctx.fillRect(X0,Y0,BW,BH);
+  ctx.fillStyle='#a8a8a8';
+  for(let y=Y0;y<Y0+BH;y+=7)for(let x=X0+((y/7)%2?3:0);x<X0+BW;x+=7)ctx.fillRect(x,y,1,1);
+  // rooms
+  for(const r of rooms){
+    const a=r.isOR?'#9cd8c8':'#e4dcb8',b=r.isOR?'#88c4b4':'#d4ccA4';
+    for(let y=0;y<RH;y+=8)for(let x=0;x<RW;x+=8){ctx.fillStyle=((x+y)/8)%2?a:b;ctx.fillRect(r.x+x,r.y+y,8,8)}
+  }
+  // bins
+  for(const b of bins){
+    ctx.fillStyle='#f83800';ctx.fillRect(b.x+3,b.y+3,8,9);ctx.fillStyle='#a81000';ctx.fillRect(b.x+2,b.y+2,10,2);
+    ctx.fillStyle='#000';ctx.fillRect(b.x+6,b.y+6,2,4);ctx.fillRect(b.x+5,b.y+7,4,2);
+  }
+  // walls
+  ctx.fillStyle='#0058a8';for(const w of walls)ctx.fillRect(w.x,w.y,w.w,w.h);
+  ctx.fillStyle='#3c7cd8';for(const w of walls)ctx.fillRect(w.x,w.y,w.w,1);
+  // room labels
+  for(const r of rooms){
+    const label=r.isOR?'OR':String(r.num);
+    ctx.fillStyle=r.clean?'#58d854':'#000';ctx.fillRect(r.x+RW-30,r.y+RH-14,26,10);
+    txt(label,r.x+RW-17,r.y+RH-13,r.clean?'#000':'#fff','center',false);
+  }
+  // beds & patients
+  for(const p of patients){
+    const b=p.room.bed,green=p.warn>0&&Math.floor(tAnim*8)%2===0;
+    if(p.or){
+      ctx.fillStyle='#7c7c7c';ctx.fillRect(b.x,b.y,b.w,b.h);ctx.fillStyle='#bcbcbc';ctx.fillRect(b.x+1,b.y+1,b.w-2,b.h-2);
+      ctx.fillStyle='#3cbcfc';ctx.fillRect(b.x+6,b.y+2,b.w-8,b.h-4);
+      ctx.fillStyle='#fcd8a8';ctx.fillRect(b.x+2,b.y+3,4,5);
+      ctx.fillStyle='#d80000';ctx.fillRect(b.x+12,b.y+4,4,3); // the oops spot
+      // surgery lamp
+      ctx.fillStyle='#f8f878';ctx.fillRect(b.x+8,b.y-8,8,3);ctx.fillStyle='#7c7c7c';ctx.fillRect(b.x+11,b.y-12,2,4);
+    }else{
+      ctx.fillStyle='#7c7c7c';ctx.fillRect(b.x,b.y,b.w,b.h);
+      ctx.fillStyle='#fcfcfc';ctx.fillRect(b.x+1,b.y+1,7,b.h-2);
+      ctx.fillStyle='#6888fc';ctx.fillRect(b.x+8,b.y+1,b.w-9,b.h-2);
+      ctx.fillStyle='#4860d8';for(let x=b.x+10;x<b.x+b.w-1;x+=4)ctx.fillRect(x,b.y+1,1,b.h-2);
+      ctx.fillStyle=green?'#80d010':p.skin;ctx.fillRect(b.x+2,b.y+3,5,6);
+      ctx.fillStyle='#000';ctx.fillRect(b.x+3,b.y+5,1,1);ctx.fillRect(b.x+5,b.y+5,1,1);
+      if(p.warn>0){ctx.fillStyle='#000';ctx.fillRect(b.x+3,b.y+7,3,1);txt('!',b.x+2,b.y-10,'#f83800','left')}
+    }
+  }
+  // messes
+  for(const m of messes){
+    const ratio=m.hp/m.max;
+    for(const p of m.px){if(p.t<ratio){ctx.fillStyle=p.col;ctx.fillRect(m.x+p.dx,m.y+p.dy,1,1)}}
+    if(m.type==='poop'){
+      ctx.fillStyle='#000';
+      for(let i=0;i<3;i++){const a=tAnim*(4+i)+m.ph+i*2;ctx.fillRect(Math.round(m.x+4+Math.cos(a)*7),Math.round(m.y-1+Math.sin(a*1.3)*4),1,1)}
+    }
+    if(m.type==='poop'||m.type==='puke'||m.type==='guts'){
+      ctx.fillStyle=m.type==='poop'?'#7c9c3c':'#a8c838';
+      for(let k=0;k<2;k++){
+        const base=m.x+2+k*4,ph=(tAnim*0.8+k*0.5+m.ph)%1;
+        for(let j=0;j<4;j++){const yy=m.y-2-j*2-ph*4;ctx.fillRect(Math.round(base+Math.sin(yy*0.8+tAnim*3)*1.5),Math.round(yy),1,1)}
+      }
+    }
+    if(m.type==='pee'&&Math.floor(tAnim*2+m.ph)%3===0){ctx.fillStyle='#fcfcb8';ctx.fillRect(m.x+4,m.y+2,2,1)}
+  }
+  // player
+  drawNurse(ctx,profile,Math.round(G.px),Math.round(G.py),G.frame,G.flip,G.gag>1.6||G.gag<-1.2);
+  // mop
+  const mopping=(keys.Space||keys.KeyE||keys.Enter||touchMop)&&G.slide<=0;
+  {const mx=G.flip?Math.round(G.px)-3:Math.round(G.px)+8,my=Math.round(G.py)+4,wig=mopping?Math.floor(tAnim*12)%2:0;
+   ctx.fillStyle='#a87c3c';ctx.fillRect(mx+1,my,1,8);ctx.fillStyle='#e8e8e8';ctx.fillRect(mx-1+wig,my+8,4,2);}
+  // particles
+  for(const p of parts){ctx.fillStyle=p.col;ctx.fillRect(Math.round(p.x),Math.round(p.y),1,1)}
+  for(const f of floaters)txt(f.s,Math.round(f.x),Math.round(f.y),f.col);
+  if(G.binHint&&G.units>0)txt('SPACE=DUMP',Math.round(G.px)-16,Math.round(G.py)-10,'#58d854');
+
+  // HUD
+  ctx.fillStyle='#000';ctx.fillRect(0,0,W,Y0);
+  txt((profile.name||'NURSE').toUpperCase().slice(0,8),2,5,'#f8d838');
+  const t=Math.ceil(G.time),mm=Math.floor(t/60),ss=String(t%60).padStart(2,'0');
+  txt(mm+':'+ss,112,5,G.time<=30?(Math.floor(tAnim*4)%2?'#f83800':'#fff'):'#fff','center');
+  txt('LEFT:'+messes.length,148,5,'#fff');
+  // bucket meter
+  ctx.fillStyle='#fff';ctx.fillRect(254,4,62,10);ctx.fillStyle='#000';ctx.fillRect(255,5,60,8);
+  const fill=G.units/G.cap;ctx.fillStyle=fill>=1?(Math.floor(tAnim*6)%2?'#f83800':'#a81000'):'#7c9c3c';ctx.fillRect(255,5,Math.round(60*fill),8);
+  txt('BKT',228,5,'#aaa');
+  // message banner
+  if(G.msgT>0){
+    ctx.font=FONT;const w=ctx.measureText(G.msg).width+8;
+    txt(G.msg,W/2,Y0+BH+4,G.msgCol,'center');
+  }
+  if(G.ready>0){
+    ctx.fillStyle='rgba(0,0,0,.6)';ctx.fillRect(0,Y0,W,BH);
+    txt('LEVEL 1: CODE BROWN',W/2,80,'#f8d838','center');
+    txt(profile.city?('ST. GROSSINGTON\'S, '+profile.city.toUpperCase()).slice(0,38):'ST. GROSSINGTON\'S HOSPITAL',W/2,96,'#3cbcfc','center');
+    txt(String(Math.ceil(G.ready)),W/2,120,'#fff','center');
+    txt('CLEAN ALL 9 ROOMS!',W/2,144,'#58d854','center');
+  }
+  if(state==='paused'){
+    ctx.fillStyle='rgba(0,0,0,.7)';ctx.fillRect(0,0,W,H);
+    txt('PAUSED',W/2,100,'#f8d838','center');
+    txt(isTouch?'TAP II TO RESUME':'PRESS P TO RESUME',W/2,120,'#fff','center');
+    txt('M = SOUND '+(muted?'OFF':'ON'),W/2,136,'#aaa','center');
+  }
+}
+
+/* ================= LOOP ================= */
+function loop(t){
+  const dt=Math.min(0.05,(t-lastT)/1000||0);lastT=t;
+  if(state==='play')update(dt);
+  if(state==='play'||state==='paused')render();
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+/* ================= SCREENS ================= */
+const $=id=>document.getElementById(id);
+function show(id){for(const s of document.querySelectorAll('.screen'))s.classList.toggle('on',s.id===id);document.body.classList.toggle('notplaying',!!id)}
+function startGame(){audioInit();newGame();state='play';show(null);fit();if(document.activeElement)document.activeElement.blur()}
+function endGame(won){
+  state='end';const used=TIME_LIMIT-G.time;
+  const bonus=won?Math.ceil(G.time)*10:0;G.score+=bonus;
+  const fmt=s=>Math.floor(s/60)+':'+String(Math.floor(s%60)).padStart(2,'0');
+  let best=store.get('best',null),newBest=false;
+  if(won){if(!best||used<best.time){best={time:used,name:profile.name};store.set('best',best);newBest=true}store.set('level2',true);sfx.win()}else sfx.lose();
+  $('endIcon').textContent=won?'🏆🧽✨':'⏰💩💀';
+  $('endTitle').textContent=won?'LEVEL 1 CLEAR!':'TIME\'S UP!';
+  $('endMsg').innerHTML=won
+    ?'Amazing work, Nurse '+esc(profile.name)+'! St. Grossington\'s is sparkling.<br><span style="color:#58d854">LEVEL 2 UNLOCKED!</span><br><span style="color:#7c7c7c">(Level 2 is still being designed... coming soon!)</span>'
+    :'The Head Nurse is NOT happy. There\'s still '+messes.length+' gross mess'+(messes.length===1?'':'es')+' on the floor. Try again!';
+  const gunk=G.gunkTotal+G.units;
+  $('endStats').innerHTML=
+    row('MESSES CLEANED',G.cleaned)+row('BUCKETS OF GUNK',gunk+' scoops')+
+    (won?row('TIME',fmt(used))+row('TIME BONUS','+'+bonus):'')+
+    row('GROSS POINTS',G.score)+(best?row('BEST TIME',fmt(best.time)+(newBest?' NEW!':'')):'');
+  $('endFact').textContent=FACTS[Math.floor(Math.random()*FACTS.length)];
+  show('sEnd');
+}
+const row=(k,v)=>'<div>'+k+'<span class="v">'+v+'</span></div>';
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+function renderTitle(){
+  $('contWrap').innerHTML='';
+  if(profile){
+    const b=document.createElement('button');b.className='btn alt';b.textContent='CONTINUE AS '+profile.name.toUpperCase();
+    b.onclick=startGame;$('contWrap').appendChild(b);
+  }
+}
+$('bHow').onclick=()=>{const h=$('howBox');h.style.display=h.style.display==='none'?'block':'none'};
+$('bNew').onclick=()=>{audioInit();openCreator()};
+$('bBack').onclick=()=>{show('sTitle');renderTitle()};
+$('bAgain').onclick=startGame;
+$('bMenu').onclick=()=>{show('sTitle');renderTitle();state='menu'};
+
+// creator
+let draft;
+function openCreator(){
+  draft=profile?{...profile}:{name:'',city:'',type:'speedy',skin:0,hair:1,style:'SHORT',scrub:0,cap:true};
+  $('inName').value=draft.name;$('inCity').value=draft.city;
+  buildCreator();show('sCreate');$('sCreate').scrollTop=0;
+}
+function buildCreator(){
+  $('types').innerHTML='';
+  for(const t of TYPES){
+    const b=document.createElement('button');b.className='card'+(draft.type===t.id?' sel':'');
+    b.innerHTML='<b>'+t.name+'</b><span>'+t.desc+'</span>';
+    b.onclick=()=>{draft.type=t.id;buildCreator()};$('types').appendChild(b);
+  }
+  swatches('rSkin',SKINS,'skin');swatches('rHair',HAIRS,'hair');swatches('rScrub',SCRUBS,'scrub');
+  opts('rStyle',STYLES,'style');opts('rCap',['YES','NO'],'cap',v=>v==='YES',v=>v?'YES':'NO');
+  drawPreview();
+}
+function swatches(id,list,key){
+  const el=$(id);el.innerHTML='';
+  list.forEach((c,i)=>{const b=document.createElement('button');b.className='sw'+(draft[key]===i?' sel':'');b.style.background=c;b.setAttribute('aria-label',key+' '+(i+1));
+    b.onclick=()=>{draft[key]=i;buildCreator()};el.appendChild(b)});
+}
+function opts(id,list,key,toVal=v=>v,fromVal=v=>v){
+  const el=$(id);el.innerHTML='';
+  list.forEach(v=>{const b=document.createElement('button');b.className='opt'+(fromVal(draft[key])===v?' sel':'');b.textContent=v;
+    b.onclick=()=>{draft[key]=toVal(v);buildCreator()};el.appendChild(b)});
+}
+function drawPreview(){
+  const c=$('pv').getContext('2d');c.clearRect(0,0,16,26);
+  c.fillStyle='#5c94fc';c.fillRect(0,0,16,26);c.fillStyle='#e4dcb8';c.fillRect(0,20,16,6);
+  drawNurse(c,draft,4,7,Math.floor(Date.now()/400)%2,false,false);
+  const n=($('inName').value||'???').toUpperCase(),city=$('inCity').value;
+  $('pvName').textContent='NURSE '+n+(city?' / '+city.toUpperCase():'');
+}
+setInterval(()=>{if($('sCreate').classList.contains('on'))drawPreview()},200);
+$('inName').oninput=$('inCity').oninput=drawPreview;
+$('bStart').onclick=()=>{
+  const name=$('inName').value.trim();
+  if(!name){$('inName').focus();$('inName').placeholder='TYPE A NAME!';$('inName').style.borderColor='#f83800';return}
+  draft.name=name;draft.city=$('inCity').value.trim();
+  profile=draft;store.set('profile',profile);startGame();
+};
+
+/* ================= INPUT ================= */
+addEventListener('keydown',e=>{
+  if(e.target.tagName==='INPUT')return;
+  keys[e.code]=true;
+  if(state==='play'||state==='paused'){
+    if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(e.code))e.preventDefault();
+    if(e.code==='KeyP'||e.code==='Escape')togglePause();
+    if(e.code==='KeyM')setMuted(!muted);
+  }
+});
+addEventListener('keyup',e=>{keys[e.code]=false});
+addEventListener('blur',()=>{keys={};if(state==='play')togglePause()});
+document.addEventListener('visibilitychange',()=>{if(document.hidden&&state==='play')togglePause()});
+function togglePause(){if(state==='play')state='paused';else if(state==='paused'){state='play';keys={}}}
+
+let isTouch=false;
+function enableTouch(){if(isTouch)return;isTouch=true;document.body.classList.add('touch');fit()}
+addEventListener('touchstart',enableTouch,{passive:true});
+if(matchMedia('(pointer:coarse)').matches)enableTouch();
+
+const joy=$('joy'),knob=$('knob');let joyId=null;
+function joyMove(e){
+  const r=joy.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2;
+  let dx=e.clientX-cx,dy=e.clientY-cy;const max=r.width/2-10,d=Math.hypot(dx,dy);
+  if(d>max){dx*=max/d;dy*=max/d}
+  knob.style.transform='translate('+dx+'px,'+dy+'px)';
+  const nx=dx/max,ny=dy/max;
+  touchVec=Math.hypot(nx,ny)<0.2?{x:0,y:0}:{x:nx,y:ny};
+}
+joy.addEventListener('pointerdown',e=>{e.preventDefault();audioInit();joyId=e.pointerId;joy.setPointerCapture(e.pointerId);joyMove(e)});
+joy.addEventListener('pointermove',e=>{if(e.pointerId===joyId)joyMove(e)});
+const joyEnd=e=>{if(e.pointerId!==joyId)return;joyId=null;touchVec={x:0,y:0};knob.style.transform=''};
+joy.addEventListener('pointerup',joyEnd);joy.addEventListener('pointercancel',joyEnd);
+const mopB=$('mop');
+mopB.addEventListener('pointerdown',e=>{e.preventDefault();audioInit();touchMop=true;mopB.classList.add('down');mopB.setPointerCapture(e.pointerId)});
+const mopEnd=()=>{touchMop=false;mopB.classList.remove('down')};
+mopB.addEventListener('pointerup',mopEnd);mopB.addEventListener('pointercancel',mopEnd);
+$('pauseBtn').addEventListener('click',()=>{togglePause()});
+document.addEventListener('contextmenu',e=>{if(state==='play')e.preventDefault()});
+
+/* ================= BOOT ================= */
+renderTitle();fit();
+if(document.fonts&&document.fonts.load)document.fonts.load(FONT).catch(()=>{});
+</script>
+</body>
+</html>
